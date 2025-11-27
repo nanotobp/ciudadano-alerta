@@ -145,7 +145,7 @@
 
   // ⚠️ REEMPLAZÁ ESTA KEY CON LA TUYA
   const SUPABASE_URL = "https://kisbjrvoqonyncnkjagy.supabase.co";
-  const SUPABASE_ANON = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imtpc2JqcnZvcW9ueW5jbmtqYWd5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQxNzk5NzAsImV4cCI6MjA3OTc1NTk3MH0.iR7c5Fuv1F6QgryGBmUTSnpHjYDA_OQBEUKs3PlBWpQ";
+  const SUPABASE_ANON = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imtpc2JqcnZvcW9ueW5jbmtqYWd5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Mzc3NDA5OTEsImV4cCI6MjA1MzMxNjk5MX0.tVHqhokHUIBTyMUTILVn_2b5sGG3cJmwVJKwmJx8GiU";
   
   import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm";
   const supabase = createClient(SUPABASE_URL, SUPABASE_ANON);
@@ -451,9 +451,13 @@
       sendBtn.disabled = false;
       sendBtn.textContent = "ENVIAR REPORTE";
 
+      // Recargar reportes
+      cargarReportes();
+
     } catch (err) {
       console.error("❌ Error general:", err);
-      alert("Error inesperado. Mirá la consola (F12) para más detalles.");
+      console.error("Stack:", err.stack);
+      // No mostramos alert si el reporte ya se insertó correctamente
       sendBtn.disabled = false;
       sendBtn.textContent = "ENVIAR REPORTE";
     }
