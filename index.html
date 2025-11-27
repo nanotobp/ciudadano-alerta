@@ -8,7 +8,6 @@
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <link rel="icon" type="image/x-icon" href="/favicon.ico">
 
-
   <!-- reCAPTCHA invisible -->
   <script src="https://www.google.com/recaptcha/api.js?render=6LfD9xksAAAAACmNyQvQNYH5QYgY_yg8-Ugvjl5-"></script>
 
@@ -41,7 +40,7 @@
     button#send{background:#00c853}
 
     .cat-grid{display:grid;grid-template-columns:1fr 1fr;gap:0.9rem;margin:1.2rem 0}
-    .cat-btn{padding:1.3rem;border-radius:10px;background:#eee;font-weight:bold;text-align:center;border:2px solid transparent}
+    .cat-btn{padding:1.3rem;border-radius:10px;background:#eee;font-weight:bold;text-align:center;border:2px solid transparent;cursor:pointer}
     .cat-btn.selected{border:2px solid #d32f2f;background:#ffebee}
 
     video{width:100%;border-radius:12px;margin:1rem 0;display:none;border:3px solid #d32f2f}
@@ -83,7 +82,7 @@
 
   <!-- FORM -->
   <div class="card" id="form" style="display:none">
-    <h2 style="color:#d32f2f;text-align:center;margin-bottom:1rem">Nuevo reporte</h2>
+    <h2 id="formTitle" style="color:#d32f2f;text-align:center;margin-bottom:1rem">Nuevo reporte</h2>
 
     <!-- Categorías -->
     <div class="cat-grid">
@@ -125,7 +124,7 @@
   <div class="modal-content">
     <h2>¡Gracias!</h2>
     <p id="modalMessage"></p>
-    <button class="modal-close" onclick="document.getElementById('modal').style.display='none'">CERRAR</button>
+    <button class="modal-close" onclick="cerrarModal()">CERRAR</button>
   </div>
 </div>
 
@@ -146,7 +145,8 @@
 <script type="module">
 
   const SUPABASE_URL = "https://kisbjrvoqonyncnkjagy.supabase.co";
-  const SUPABASE_ANON = "YOUR_ANON_KEY_AQUI";
+  const SUPABASE_ANON = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imtpc2JqcnZvcW9ueW5jbmtqYWd5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Mzc3NDA5OTEsImV4cCI6MjA1MzMxNjk5MX0.tVHqhokHUIBTyMUTILVn_2b5sGG3cJmwVJKwmJx8GiU";
+  
   import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm";
   const supabase = createClient(SUPABASE_URL, SUPABASE_ANON);
 
@@ -165,22 +165,59 @@
     }).addTo(map);
 
     document.getElementById("form").style.display = "block";
-    setTimeout(() => document.getElementById("form").scrollIntoView({behavior:"smooth", block:"center"}), 200);
+    
+    // Scroll más suave hasta el título del formulario
+    setTimeout(() => {
+      const formTitle = document.getElementById("formTitle");
+      formTitle.scrollIntoView({behavior:"smooth", block:"start"});
+    }, 200);
   });
 
   window.selectCat = (el, cat) => {
     categoria = cat;
     document.querySelectorAll(".cat-btn").forEach(b => b.classList.remove("selected"));
     el.classList.add("selected");
-    mostrarResumen();
+    validarFormulario();
   };
+
+  // Agregar listeners para validar en tiempo real
+  document.getElementById("nombre").addEventListener("input", validarFormulario);
+  document.getElementById("celular").addEventListener("input", validarFormulario);
+  document.getElementById("barrio").addEventListener("input", validarFormulario);
+  document.getElementById("detalle").addEventListener("input", validarFormulario);
+
+  function validarFormulario() {
+    const nombre = document.getElementById("nombre").value.trim();
+    const celular = document.getElementById("celular").value.trim();
+    const barrio = document.getElementById("barrio").value.trim();
+
+    if (categoria && fotos.length > 0 && nombre && celular && barrio) {
+      document.getElementById("resumenTexto").innerHTML = `
+        Tipo: <b>${categoria.toUpperCase()}</b><br>
+        Nombre: ${nombre}<br>
+        Celular: ${celular}<br>
+        Barrio: ${barrio}<br>
+        Fotos: ${fotos.length}
+      `;
+      document.getElementById("summary").style.display = "block";
+      document.getElementById("send").style.display = "block";
+    } else {
+      document.getElementById("summary").style.display = "none";
+      document.getElementById("send").style.display = "none";
+    }
+  }
 
   document.getElementById("takePhoto").onclick = async () => {
     if (fotos.length >= 5) return alert("Máximo 5 fotos");
     const video = document.getElementById("camera");
     video.style.display = "block";
-    videoStream = await navigator.mediaDevices.getUserMedia({video:{facingMode:"environment"}});
-    video.srcObject = videoStream;
+    try {
+      videoStream = await navigator.mediaDevices.getUserMedia({video:{facingMode:"environment"}});
+      video.srcObject = videoStream;
+    } catch (err) {
+      alert("No se pudo acceder a la cámara");
+      video.style.display = "none";
+    }
   };
 
   document.getElementById("camera").onclick = () => {
@@ -196,7 +233,9 @@
         mostrarFotos();
         video.style.display = "none";
         if (videoStream) videoStream.getTracks().forEach(t => t.stop());
-        mostrarResumen();
+        validarFormulario();
+      } else {
+        alert("La foto es muy pesada. Intentá de nuevo.");
       }
     }, "image/jpeg", 0.85);
   };
@@ -206,28 +245,16 @@
       fotos.map((f, i) => `
         <div class="foto-thumb">
           <img src="${URL.createObjectURL(f)}">
-          <div class="remove-photo" onclick="fotos.splice(${i},1);mostrarFotos();mostrarResumen()">X</div>
+          <div class="remove-photo" onclick="eliminarFoto(${i})">X</div>
         </div>
       `).join("");
   }
 
-  function mostrarResumen() {
-    const nombre = document.getElementById("nombre").value.trim();
-    const celular = document.getElementById("celular").value.trim();
-    const barrio = document.getElementById("barrio").value.trim();
-
-    if (categoria && fotos.length > 0 && nombre && celular && barrio) {
-      document.getElementById("resumenTexto").innerHTML = `
-        Tipo: <b>${categoria.toUpperCase()}</b><br>
-        Nombre: ${nombre}<br>
-        Celular: ${celular}<br>
-        Barrio: ${barrio}<br>
-        Fotos: ${fotos.length}
-      `;
-      document.getElementById("summary").style.display = "block";
-      document.getElementById("send").style.display = "block";
-    }
-  }
+  window.eliminarFoto = (index) => {
+    fotos.splice(index, 1);
+    mostrarFotos();
+    validarFormulario();
+  };
 
   window.cancelarReporte = () => {
     if (marker) marker.remove();
@@ -235,36 +262,74 @@
     categoria = "";
     videoStream?.getTracks().forEach(t => t.stop());
     document.getElementById("form").style.display = "none";
+    document.getElementById("form").reset();
+    document.querySelectorAll(".cat-btn").forEach(b => b.classList.remove("selected"));
+    document.getElementById("summary").style.display = "none";
+    document.getElementById("send").style.display = "none";
+    document.getElementById("fotosContainer").innerHTML = "";
+  };
+
+  window.cerrarModal = () => {
+    document.getElementById("modal").style.display = "none";
+    window.location.reload(); // Recargar para actualizar estadísticas
   };
 
   // ENVÍO DEL REPORTE
   document.getElementById("send").onclick = async () => {
+    const sendBtn = document.getElementById("send");
+    sendBtn.disabled = true;
+    sendBtn.textContent = "ENVIANDO...";
 
-    grecaptcha.ready(async () => {
-      const recaptchaToken = await grecaptcha.execute(
-        "6LfD9xksAAAAACmNyQvQNYH5QYgY_yg8-Ugvjl5-", 
-        { action: "submit" }
-      );
+    try {
+      const recaptchaToken = await new Promise((resolve) => {
+        grecaptcha.ready(async () => {
+          const token = await grecaptcha.execute(
+            "6LfD9xksAAAAACmNyQvQNYH5QYgY_yg8-Ugvjl5-", 
+            { action: "submit" }
+          );
+          resolve(token);
+        });
+      });
 
       const nombre = document.getElementById("nombre").value.trim();
       const celular = document.getElementById("celular").value.trim();
       const detalle = document.getElementById("detalle").value.trim();
       const barrio = document.getElementById("barrio").value.trim();
 
-      if (!categoria || fotos.length < 1)
-        return alert("Elegí categoría y sacá al menos 1 foto.");
+      if (!categoria || fotos.length < 1) {
+        alert("Elegí categoría y sacá al menos 1 foto.");
+        sendBtn.disabled = false;
+        sendBtn.textContent = "ENVIAR REPORTE";
+        return;
+      }
+
+      // Determinar departamento_id según categoría
+      let departamento_id = 1; // Por defecto obras
+      if (categoria === "basura") departamento_id = 2; // aseo
+      else if (categoria === "arbol") departamento_id = 3; // parques
+      else if (categoria === "drogas") departamento_id = 4; // seguridad
 
       // SUBIDA DE FOTOS
       const urls = [];
       for (let i = 0; i < fotos.length; i++) {
         const fileName = `foto_${Date.now()}_${i}.jpg`;
-        await supabase.storage.from("fotos").upload(fileName, fotos[i]);
-        const { data: { publicUrl }} = supabase.storage.from("fotos").getPublicUrl(fileName);
+        const { error: uploadError } = await supabase.storage
+          .from("fotos")
+          .upload(fileName, fotos[i]);
+        
+        if (uploadError) {
+          console.error("Error subiendo foto:", uploadError);
+          continue;
+        }
+
+        const { data: { publicUrl }} = supabase.storage
+          .from("fotos")
+          .getPublicUrl(fileName);
         urls.push(publicUrl);
       }
 
       // INSERT
-      await supabase.from("reportes").insert({
+      const { data, error } = await supabase.from("reportes").insert({
         lat: selectedLat,
         lng: selectedLng,
         categoria,
@@ -274,25 +339,55 @@
         barrio,
         fotos_url: urls,
         estado: "pendiente",
-        recaptcha_token: recaptchaToken
-      });
+        departamento_id
+      }).select();
+
+      if (error) {
+        console.error("Error insertando reporte:", error);
+        alert("Error al enviar el reporte. Intentá de nuevo.");
+        sendBtn.disabled = false;
+        sendBtn.textContent = "ENVIAR REPORTE";
+        return;
+      }
+
+      console.log("Reporte creado:", data);
 
       document.getElementById("modalMessage").innerHTML =
         `¡Gracias <b>${nombre.split(" ")[0]}</b>!<br><br>
         Tu reporte fue enviado y será atendido en breve.`;
       document.getElementById("modal").style.display = "flex";
 
+      // Limpiar formulario
       fotos = [];
       categoria = "";
       if (marker) marker.remove();
       document.getElementById("form").style.display = "none";
-    });
+      document.getElementById("form").reset();
+      document.querySelectorAll(".cat-btn").forEach(b => b.classList.remove("selected"));
+      document.getElementById("fotosContainer").innerHTML = "";
+      
+      sendBtn.disabled = false;
+      sendBtn.textContent = "ENVIAR REPORTE";
 
+    } catch (error) {
+      console.error("Error general:", error);
+      alert("Error al enviar el reporte. Intentá de nuevo.");
+      sendBtn.disabled = false;
+      sendBtn.textContent = "ENVIAR REPORTE";
+    }
   };
 
   // CARGAR REPORTES (mapa)
   async function cargarReportes() {
-    const {data} = await supabase.from("reportes").select("*").order("created_at", {ascending:false});
+    const {data, error} = await supabase
+      .from("reportes")
+      .select("*")
+      .order("created_at", {ascending:false});
+
+    if (error) {
+      console.error("Error cargando reportes:", error);
+      return;
+    }
 
     document.getElementById("total").textContent = data.length;
     document.getElementById("pendientes").textContent =
@@ -320,13 +415,15 @@
       .bindPopup(`
         <b>${r.categoria.toUpperCase()}</b><br>
         Estado: <b>${r.estado}</b><br>
-        Barrio: ${r.barrio}<br>
+        Barrio: ${r.barrio || 'N/A'}<br>
         ${r.detalle || ""}<br>
-        ${r.fotos_url.map(u => `<img src="${u}" width="200" style="margin-top:6px;border-radius:6px;">`).join("")}
+        ${Array.isArray(r.fotos_url) ? r.fotos_url.map(u => `<img src="${u}" width="200" style="margin-top:6px;border-radius:6px;">`).join("") : ''}
       `);
     });
   }
+
   cargarReportes();
+  
   supabase.channel("reportes").on("postgres_changes",
     {event:"*",schema:"public",table:"reportes"},
     () => cargarReportes()
