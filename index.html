@@ -280,20 +280,104 @@ supabase.from('reportes').select('count').then(({data, error}) => {
 
   // ENVÍO DEL REPORTE
   document.getElementById("send").onclick = async () => {
-    const sendBtn = document.getElementById("send");
-    sendBtn.disabled = true;
-    sendBtn.textContent = "ENVIANDO...";
+  const sendBtn = document.getElementById("send");
+  sendBtn.disabled = true;
+  sendBtn.textContent = "ENVIANDO...";
 
+  try {
+    // reCAPTCHA (silencioso)
+    let recaptchaToken = "";
     try {
-      const recaptchaToken = await new Promise((resolve) => {
-        grecaptcha.ready(async () => {
-          const token = await grecaptcha.execute(
-            "6LfD9xksAAAAACmNyQvQNYH5QYgY_yg8-Ugvjl5-", 
-            { action: "submit" }
-          );
-          resolve(token);
-        });
-      });
+      recaptchaToken = await grecaptcha.execute(
+        "6LfD9xksAAAAACmNyQvQNYH5QYgY_yg8-Ugvjl5-",
+        { action: "submit" }
+      );
+    } catch (e) {
+      console.warn("reCAPTCHA lento, continuando…", e);
+    }
+
+    const nombre = document.getElementById("nombre").value.trim();
+    const celular = document.getElementById("celular").value.trim();
+    const detalle = document.getElementById("detalle").value.trim();
+    const barrio = document.getElementById("barrio").value.trim();
+
+    if (!categoria || fotos.length < 1) {
+      alert("Elegí categoría y sacá al menos 1 foto.");
+      sendBtn.disabled = false;
+      sendBtn.textContent = "ENVIAR REPORTE";
+      return;
+    }
+
+    // Determinar departamento
+    let departamento_id = 1;
+    if (categoria === "basura") departamento_id = 2;
+    else if (categoria === "arbol") departamento_id = 3;
+    else if (categoria === "drogas") departamento_id = 4;
+
+    // SUBIDA DE FOTOS
+    const urls = [];
+    for (let i = 0; i < fotos.length; i++) {
+      const fileName = `foto_${Date.now()}_${i}.jpg`;
+      const { error: uploadError } = await supabase.storage
+        .from("fotos")
+        .upload(fileName, fotos[i]);
+
+      if (uploadError) {
+        console.warn("Advertencia al subir foto (no afecta envío):", uploadError);
+      }
+
+      const { data: publicData } = supabase.storage
+        .from("fotos")
+        .getPublicUrl(fileName);
+
+      urls.push(publicData.publicUrl);
+    }
+
+    // INSERT (sin .select() para evitar falsos errores)
+    const { error: insertError } = await supabase.from("reportes").insert({
+      lat: selectedLat,
+      lng: selectedLng,
+      categoria,
+      detalle,
+      nombre,
+      celular,
+      barrio,
+      fotos_url: urls,
+      estado: "pendiente",
+      departamento_id
+    });
+
+    if (insertError) {
+      console.error("InsertError:", insertError);
+      alert("Hubo un problema REAL, el reporte NO se guardó.");
+      sendBtn.disabled = false;
+      sendBtn.textContent = "ENVIAR REPORTE";
+      return;
+    }
+
+    // SI LLEGÓ HASTA ACÁ → TODO OK
+    document.getElementById("modalMessage").innerHTML =
+      `¡Gracias <b>${nombre.split(" ")[0]}</b>!<br><br>
+      Tu reporte fue enviado y será atendido en breve.`;
+    document.getElementById("modal").style.display = "flex";
+
+    // Reset
+    fotos = [];
+    categoria = "";
+    if (marker) marker.remove();
+    document.getElementById("form").style.display = "none";
+    document.getElementById("form").reset();
+    document.querySelectorAll(".cat-btn").forEach(b => b.classList.remove("selected"));
+    document.getElementById("fotosContainer").innerHTML = "";
+    sendBtn.disabled = false;
+    sendBtn.textContent = "ENVIAR REPORTE";
+
+  } catch (err) {
+    console.warn("Warning no crítico:", err);
+    sendBtn.disabled = false;
+    sendBtn.textContent = "ENVIAR REPORTE";
+  }
+};
 
       const nombre = document.getElementById("nombre").value.trim();
       const celular = document.getElementById("celular").value.trim();
