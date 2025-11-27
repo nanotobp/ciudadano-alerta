@@ -289,7 +289,7 @@ supabase.from('reportes').select('count').then(({data, error}) => {
     let recaptchaToken = "";
     try {
       recaptchaToken = await grecaptcha.execute(
-        "6LfD9xksAAAAACmNyQvQNYH5QYgY_yg8-Ugvjl5-",
+        "6LfD9xksAAAAACmNyQvQNYH5QYgY_yg8-Ugvjl5-", 
         { action: "submit" }
       );
     } catch (e) {
@@ -333,7 +333,7 @@ supabase.from('reportes').select('count').then(({data, error}) => {
       urls.push(publicData.publicUrl);
     }
 
-    // INSERT (sin .select() para evitar falsos errores)
+    // INSERT sin .select() para evitar falsos errores
     const { error: insertError } = await supabase.from("reportes").insert({
       lat: selectedLat,
       lng: selectedLng,
@@ -354,6 +354,31 @@ supabase.from('reportes').select('count').then(({data, error}) => {
       sendBtn.textContent = "ENVIAR REPORTE";
       return;
     }
+
+    // SI LLEGA ACÁ → TODO OK
+    document.getElementById("modalMessage").innerHTML =
+      `¡Gracias <b>${nombre.split(" ")[0]}</b>!<br><br>
+      Tu reporte fue enviado y será atendido en breve.`;
+    document.getElementById("modal").style.display = "flex";
+
+    // Reset
+    fotos = [];
+    categoria = "";
+    if (marker) marker.remove();
+    document.getElementById("form").style.display = "none";
+    document.getElementById("form").reset();
+    document.querySelectorAll(".cat-btn").forEach(b => b.classList.remove("selected"));
+    document.getElementById("fotosContainer").innerHTML = "";
+    sendBtn.disabled = false;
+    sendBtn.textContent = "ENVIAR REPORTE";
+
+  } catch (err) {
+    console.warn("Warning no crítico:", err);
+    sendBtn.disabled = false;
+    sendBtn.textContent = "ENVIAR REPORTE";
+  }
+};
+
 
     // SI LLEGÓ HASTA ACÁ → TODO OK
     document.getElementById("modalMessage").innerHTML =
