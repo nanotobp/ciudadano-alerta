@@ -5,10 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
   <title>AsuAlerta – Acceso Municipal</title>
   <link rel="icon" type="image/x-icon" href="/favicon.ico">
-
-
   <link href="https://cdn.jsdelivr.net/npm/@tabler/core@1.0.0-beta19/dist/css/tabler.min.css" rel="stylesheet"/>
-
   <style>
     .page-center {
       min-height: 100vh;
@@ -18,90 +15,135 @@
     }
     .brand-logo { height: 52px; }
   </style>
-
   <script>
     document.addEventListener("DOMContentLoaded", () => {
       const theme = localStorage.getItem("asu_theme");
       if (theme === "dark") document.documentElement.setAttribute("data-bs-theme", "dark");
-
       const jwt = localStorage.getItem("asu_jwt");
       const rol = localStorage.getItem("asu_rol");
       if (jwt && rol) {
-        if (rol === "operador") location.href = "panel-operador.html";
-        else location.href = "panel-intendente.html";
+        if (rol === "operador") location.href = "/panel-operador";
+        else if (rol === "intendente") location.href = "/panel-intendente";
+        else if (rol === "superadmin") location.href = "/panel-superadmin";
       }
     });
   </script>
 </head>
-
 <body class="border-top-wide border-primary d-flex flex-column">
-
   <div class="page page-center">
     <div class="container-tight py-4">
-
       <div class="text-center mb-4">
         <img src="https://www.asuncion.gov.py/wp-content/uploads/2025/09/cropped-logo-ultimo-02-scaled-1-2048x821.png"
-             class="brand-logo">
+             class="brand-logo" alt="Logo Municipalidad">
         <h2 class="h3 mt-3">Panel Municipal – AsuAlerta</h2>
       </div>
-
       <div class="card card-md">
         <div class="card-body">
           <h2 class="card-title text-center mb-4">Iniciar sesión</h2>
-
           <div class="mb-3">
             <label class="form-label">Correo institucional</label>
             <input type="email" class="form-control" id="email" placeholder="nombre@asuncion.gov.py">
           </div>
-
           <div class="mb-3">
             <label class="form-label">Contraseña</label>
             <input type="password" class="form-control" id="password" placeholder="••••••••">
           </div>
-
-          <div id="errorBox" class="text-danger mb-3" style="display:none;"></div>
-
-          <button id="loginBtn" class="btn btn-primary w-100">Ingresar</button>
+          <div id="errorBox" class="alert alert-danger" style="display:none;"></div>
+          <button id="loginBtn" class="btn btn-primary w-100">
+            <span id="btnText">Ingresar</span>
+            <span id="btnSpinner" class="spinner-border spinner-border-sm ms-2" style="display:none;"></span>
+          </button>
         </div>
       </div>
-
       <div class="text-center text-muted mt-3">
         AsuAlerta 2025 – Municipalidad de Asunción
       </div>
-
     </div>
   </div>
-
   <script>
     const WORKER_URL = "https://cold-base-33cf.nanotobp.workers.dev";
-
+    
     async function login() {
       const email = document.getElementById("email").value.trim();
       const password = document.getElementById("password").value.trim();
       const errorBox = document.getElementById("errorBox");
-
+      const loginBtn = document.getElementById("loginBtn");
+      const btnText = document.getElementById("btnText");
+      const btnSpinner = document.getElementById("btnSpinner");
+      
+      // Validación básica
       if (!email || !password) {
         errorBox.style.display = "block";
         errorBox.textContent = "Ingresá usuario y contraseña";
         return;
       }
-
-      const res = await fetch(`${WORKER_URL}/login`, {
-        method: "POST",
-        headers: {"Content-Type":"application/json"},
-        body: JSON.stringify({ email, password })
-      });
-
-      const json = await res.json();
-      if (!res.ok) {
+      
+      // Mostrar loading
+      loginBtn.disabled = true;
+      btnText.textContent = "Ingresando...";
+      btnSpinner.style.display = "inline-block";
+      errorBox.style.display = "none";
+      
+      try {
+        // CORRECCIÓN AQUÍ: usar paréntesis en lugar de backticks
+        const res = await fetch(`${WORKER_URL}/login`, {
+          method: "POST",
+          headers: {"Content-Type": "application/json"},
+          body: JSON.stringify({ email, password })
+        });
+        
+        const json = await res.json();
+        
+        if (!res.ok) {
+          errorBox.style.display = "block";
+          errorBox.textContent = json.error || "Error al iniciar sesión";
+          loginBtn.disabled = false;
+          btnText.textContent = "Ingresar";
+          btnSpinner.style.display = "none";
+          return;
+        }
+        
+        // Guardar datos en localStorage
+        localStorage.setItem("asu_jwt", json.token);
+        localStorage.setItem("asu_email", email);
+        localStorage.setItem("asu_rol", json.rol);
+        localStorage.setItem("asu_departamento", json.departamento);
+        
+        // Redirigir según rol
+        if (json.rol === "operador") {
+          location.href = "/panel-operador";
+        } else if (json.rol === "intendente") {
+          location.href = "/panel-intendente";
+        } else if (json.rol === "superadmin") {
+          location.href = "/panel-superadmin";
+        } else {
+          errorBox.style.display = "block";
+          errorBox.textContent = "Rol no reconocido";
+          loginBtn.disabled = false;
+          btnText.textContent = "Ingresar";
+          btnSpinner.style.display = "none";
+        }
+        
+      } catch (error) {
+        console.error("Error:", error);
         errorBox.style.display = "block";
-        errorBox.textContent = json.error || "Error";
-        return;
+        errorBox.textContent = "Error de conexión. Intentá de nuevo.";
+        loginBtn.disabled = false;
+        btnText.textContent = "Ingresar";
+        btnSpinner.style.display = "none";
       }
-
-      localStorage.setItem("asu_jwt", json.token);
-      localStorage.setItem("asu_email", email);
-      localStorage.setItem("asu_rol", json.rol);
-      localStorage.setItem("asu_departamento", json.departamento);
-
-      if (json.rol ===
+    }
+    
+    // Event listeners
+    document.getElementById("loginBtn").addEventListener("click", login);
+    
+    // Permitir Enter para enviar
+    document.getElementById("password").addEventListener("keypress", (e) => {
+      if (e.key === "Enter") login();
+    });
+    document.getElementById("email").addEventListener("keypress", (e) => {
+      if (e.key === "Enter") login();
+    });
+  </script>
+</body>
+</html>
