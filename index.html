@@ -1,0 +1,336 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>AsuAlerta – Asunción</title>
+  <meta name="theme-color" content="#d32f2f">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+
+  <!-- reCAPTCHA invisible -->
+  <script src="https://www.google.com/recaptcha/api.js?render=6LfD9xksAAAAACmNyQvQNYH5QYgY_yg8-Ugvjl5-"></script>
+
+  <style>
+    *{margin:0;padding:0;box-sizing:border-box}
+    body{font-family:Helvetica,Arial,sans-serif;background:#fff;color:#000;line-height:1.5}
+    header{
+      display:flex;align-items:center;justify-content:center;gap:22px;padding:18px 20px;background:#fff;
+      border-bottom:5px solid #d32f2f;position:sticky;top:0;z-index:1000;box-shadow:0 4px 15px rgba(0,0,0,0.15);
+    }
+    header img{height:102px;image-rendering:-webkit-optimize-contrast}
+    header h1{font-size:1.2rem;font-weight:900;color:#d32f2f;margin:0;letter-spacing:1.3px}
+
+    #map{height:62vh;border:5px solid #d32f2f;margin:14px;border-radius:16px;overflow:hidden}
+    .click-hint{text-align:center;padding:0.7rem;font-size:1.3rem;color:#d32f2f;font-weight:bold}
+    .container{max-width:1200px;margin:auto;padding:0 1rem}
+
+    .stats{display:grid;grid-template-columns:1fr 1fr 1fr;gap:0.8rem;margin:1.4rem 1rem;justify-content:center}
+    .stat{background:#d32f2f;color:white;padding:0.9rem 0.6rem;border-radius:14px;min-height:88px;
+      display:flex;flex-direction:column;justify-content:center;align-items:center;font-weight:bold;
+      box-shadow:0 4px 12px rgba(211,47,47,0.3);font-size:0.9rem}
+    .stat:nth-child(2){background:#ff6b6b}
+    .stat:nth-child(3){background:#00c853}
+    .big{font-size:2.3rem;font-weight:900;line-height:1;margin-bottom:3px}
+
+    input,button{padding:1rem;margin:0.6rem 0;width:100%;border:none;border-radius:10px;font-size:1rem}
+    input{background:#eee;color:#000;border:1px solid #ccc}
+    button{background:#d32f2f;color:white;font-weight:900;cursor:pointer}
+    button:active{background:#b71c1c}
+    button#send{background:#00c853}
+
+    .cat-grid{display:grid;grid-template-columns:1fr 1fr;gap:0.9rem;margin:1.2rem 0}
+    .cat-btn{padding:1.3rem;border-radius:10px;background:#eee;font-weight:bold;text-align:center;border:2px solid transparent}
+    .cat-btn.selected{border:2px solid #d32f2f;background:#ffebee}
+
+    video{width:100%;border-radius:12px;margin:1rem 0;display:none;border:3px solid #d32f2f}
+
+    .fotos-preview{display:flex;flex-wrap:wrap;gap:12px;margin:1rem 0}
+    .foto-thumb{position:relative;width:90px;height:90px;border-radius:10px;overflow:hidden;border:3px solid #d32f2f}
+    .foto-thumb img{width:100%;height:100%;object-fit:cover}
+    .remove-photo{position:absolute;top:4px;right:4px;background:#d32f2f;color:white;width:24px;height:24px;border-radius:50%;font-weight:bold;cursor:pointer;line-height:24px;text-align:center}
+
+    .summary{background:#fff3e0;padding:1.2rem;border-radius:10px;margin:1rem 0;border:1px solid #ff8a65;font-size:0.95rem}
+    .small{font-size:0.82rem;color:#666;margin-top:0.5rem}
+
+    footer{background:#fff;padding:2.5rem 1rem;text-align:center;border-top:5px solid #d32f2f;margin-top:3rem}
+    footer img{max-width:300px;width:90%;margin:1.5rem 0}
+
+    #modal{background:rgba(0,0,0,0.8);position:fixed;top:0;left:0;right:0;bottom:0;display:none;align-items:center;justify-content:center;z-index:9999;padding:1rem}
+    .modal-content{background:#fff;border-radius:16px;max-width:500px;width:100%;text-align:center;padding:2rem;box-shadow:0 10px 30px rgba(0,0,0,0.3);border:4px solid #d32f2f}
+  </style>
+</head>
+
+<body>
+
+<header>
+  <img src="https://www.asuncion.gov.py/wp-content/uploads/2025/09/cropped-logo-ultimo-02-scaled-1-2048x821.png" alt="Municipalidad">
+  <h1>ALERTAS</h1>
+</header>
+
+<div class="click-hint">Tocá el mapa donde está el problema</div>
+<div id="map"></div>
+
+<div class="container">
+
+  <!-- ESTADÍSTICAS -->
+  <div class="stats">
+    <div class="stat"><div class="big" id="total">0</div><span>Total</span></div>
+    <div class="stat"><div class="big" id="pendientes">0</div><span>Pendientes</span></div>
+    <div class="stat"><div class="big" id="solucionados">0</div><span>Solucionados</span></div>
+  </div>
+
+  <!-- FORM -->
+  <div class="card" id="form" style="display:none">
+    <h2 style="color:#d32f2f;text-align:center;margin-bottom:1rem">Nuevo reporte</h2>
+
+    <!-- Categorías -->
+    <div class="cat-grid">
+      <div class="cat-btn" onclick="selectCat(this,'bache')">Bache</div>
+      <div class="cat-btn" onclick="selectCat(this,'arbol')">Árbol caído</div>
+      <div class="cat-btn" onclick="selectCat(this,'basura')">Basural</div>
+      <div class="cat-btn" onclick="selectCat(this,'drogas')">Boca / adictos</div>
+    </div>
+
+    <input type="text" id="nombre" placeholder="Nombre y apellido *" required>
+    <input type="tel" id="celular" placeholder="Celular 0983... *" required>
+    <input type="text" id="detalle" placeholder="Descripción breve (opcional)">
+
+    <!-- BARRIO -->
+    <label for="barrio" style="font-weight:bold;color:#d32f2f;margin-top:1rem">Barrio *</label>
+    <input id="barrio" name="barrio" type="text" placeholder="Ej: Barrio Jara" required>
+
+    <button id="takePhoto">TOMAR FOTO</button>
+
+    <video id="camera" autoplay playsinline></video>
+    <canvas id="canvas" style="display:none"></canvas>
+
+    <div id="fotosContainer" class="fotos-preview"></div>
+    <div class="small">Máximo 5 fotos • Total máx. 5 MB</div>
+
+    <!-- RESUMEN -->
+    <div class="summary" id="summary" style="display:none">
+      <b>Resumen:</b><br>
+      <span id="resumenTexto"></span>
+    </div>
+
+    <button id="send" style="display:none">ENVIAR REPORTE</button>
+    <button onclick="cancelarReporte()" style="background:#666">Cancelar</button>
+  </div>
+</div>
+
+<!-- MODAL -->
+<div id="modal">
+  <div class="modal-content">
+    <h2>¡Gracias!</h2>
+    <p id="modalMessage"></p>
+    <button class="modal-close" onclick="document.getElementById('modal').style.display='none'">CERRAR</button>
+  </div>
+</div>
+
+<footer>
+  <h3 style="color:#d32f2f;font-size:1.4rem;margin-bottom:1rem">¿Cómo usar AsuAlerta?</h3>
+  <p style="max-width:700px;margin:auto;color:#000">
+    1. Tocá el mapa donde está el problema<br>
+    2. Elegí el tipo de alerta<br>
+    3. Tomá la foto<br>
+    4. Revisá y enviá
+  </p>
+</footer>
+
+<!-- Leaflet -->
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+<!-- Supabase -->
+<script type="module">
+
+  const SUPABASE_URL = "https://kisbjrvoqonyncnkjagy.supabase.co";
+  const SUPABASE_ANON = "YOUR_ANON_KEY_AQUI";
+  import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm";
+  const supabase = createClient(SUPABASE_URL, SUPABASE_ANON);
+
+  let marker, selectedLat, selectedLng, fotos = [], categoria = "", videoStream = null;
+
+  const map = L.map('map').setView([-25.2820, -57.6300], 14);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+
+  map.on("click", e => {
+    selectedLat = e.latlng.lat;
+    selectedLng = e.latlng.lng;
+
+    if (marker) marker.remove();
+    marker = L.circleMarker([selectedLat, selectedLng], {
+      color: "#d32f2f", radius: 16, fillOpacity: 0.9
+    }).addTo(map);
+
+    document.getElementById("form").style.display = "block";
+    setTimeout(() => document.getElementById("form").scrollIntoView({behavior:"smooth", block:"center"}), 200);
+  });
+
+  window.selectCat = (el, cat) => {
+    categoria = cat;
+    document.querySelectorAll(".cat-btn").forEach(b => b.classList.remove("selected"));
+    el.classList.add("selected");
+    mostrarResumen();
+  };
+
+  document.getElementById("takePhoto").onclick = async () => {
+    if (fotos.length >= 5) return alert("Máximo 5 fotos");
+    const video = document.getElementById("camera");
+    video.style.display = "block";
+    videoStream = await navigator.mediaDevices.getUserMedia({video:{facingMode:"environment"}});
+    video.srcObject = videoStream;
+  };
+
+  document.getElementById("camera").onclick = () => {
+    const video = document.getElementById("camera");
+    const canvas = document.getElementById("canvas");
+    canvas.width = video.videoWidth || 1280;
+    canvas.height = video.videoHeight || 720;
+    canvas.getContext("2d").drawImage(video, 0, 0);
+
+    canvas.toBlob(blob => {
+      if (blob.size <= 5 * 1024 * 1024) {
+        fotos.push(blob);
+        mostrarFotos();
+        video.style.display = "none";
+        if (videoStream) videoStream.getTracks().forEach(t => t.stop());
+        mostrarResumen();
+      }
+    }, "image/jpeg", 0.85);
+  };
+
+  function mostrarFotos() {
+    document.getElementById("fotosContainer").innerHTML =
+      fotos.map((f, i) => `
+        <div class="foto-thumb">
+          <img src="${URL.createObjectURL(f)}">
+          <div class="remove-photo" onclick="fotos.splice(${i},1);mostrarFotos();mostrarResumen()">X</div>
+        </div>
+      `).join("");
+  }
+
+  function mostrarResumen() {
+    const nombre = document.getElementById("nombre").value.trim();
+    const celular = document.getElementById("celular").value.trim();
+    const barrio = document.getElementById("barrio").value.trim();
+
+    if (categoria && fotos.length > 0 && nombre && celular && barrio) {
+      document.getElementById("resumenTexto").innerHTML = `
+        Tipo: <b>${categoria.toUpperCase()}</b><br>
+        Nombre: ${nombre}<br>
+        Celular: ${celular}<br>
+        Barrio: ${barrio}<br>
+        Fotos: ${fotos.length}
+      `;
+      document.getElementById("summary").style.display = "block";
+      document.getElementById("send").style.display = "block";
+    }
+  }
+
+  window.cancelarReporte = () => {
+    if (marker) marker.remove();
+    fotos = [];
+    categoria = "";
+    videoStream?.getTracks().forEach(t => t.stop());
+    document.getElementById("form").style.display = "none";
+  };
+
+  // ENVÍO DEL REPORTE
+  document.getElementById("send").onclick = async () => {
+
+    grecaptcha.ready(async () => {
+      const recaptchaToken = await grecaptcha.execute(
+        "6LfD9xksAAAAACmNyQvQNYH5QYgY_yg8-Ugvjl5-", 
+        { action: "submit" }
+      );
+
+      const nombre = document.getElementById("nombre").value.trim();
+      const celular = document.getElementById("celular").value.trim();
+      const detalle = document.getElementById("detalle").value.trim();
+      const barrio = document.getElementById("barrio").value.trim();
+
+      if (!categoria || fotos.length < 1)
+        return alert("Elegí categoría y sacá al menos 1 foto.");
+
+      // SUBIDA DE FOTOS
+      const urls = [];
+      for (let i = 0; i < fotos.length; i++) {
+        const fileName = `foto_${Date.now()}_${i}.jpg`;
+        await supabase.storage.from("fotos").upload(fileName, fotos[i]);
+        const { data: { publicUrl }} = supabase.storage.from("fotos").getPublicUrl(fileName);
+        urls.push(publicUrl);
+      }
+
+      // INSERT
+      await supabase.from("reportes").insert({
+        lat: selectedLat,
+        lng: selectedLng,
+        categoria,
+        detalle,
+        nombre,
+        celular,
+        barrio,
+        fotos_url: urls,
+        estado: "pendiente",
+        recaptcha_token: recaptchaToken
+      });
+
+      document.getElementById("modalMessage").innerHTML =
+        `¡Gracias <b>${nombre.split(" ")[0]}</b>!<br><br>
+        Tu reporte fue enviado y será atendido en breve.`;
+      document.getElementById("modal").style.display = "flex";
+
+      fotos = [];
+      categoria = "";
+      if (marker) marker.remove();
+      document.getElementById("form").style.display = "none";
+    });
+
+  };
+
+  // CARGAR REPORTES (mapa)
+  async function cargarReportes() {
+    const {data} = await supabase.from("reportes").select("*").order("created_at", {ascending:false});
+
+    document.getElementById("total").textContent = data.length;
+    document.getElementById("pendientes").textContent =
+      data.filter(r => r.estado !== "solucionado").length;
+    document.getElementById("solucionados").textContent =
+      data.filter(r => r.estado === "solucionado").length;
+
+    // eliminar marcadores anteriores
+    map.eachLayer(l => {
+      if (l instanceof L.CircleMarker && l !== marker) map.removeLayer(l);
+    });
+
+    data.forEach(r => {
+      const color =
+        r.estado === "solucionado" ? "#00c853" :
+        r.categoria === "bache" ? "#d32f2f" :
+        r.categoria === "arbol" ? "#b8860b" :
+        r.categoria === "basura" ? "#2e7d32" : "#8e24aa";
+
+      L.circleMarker([r.lat, r.lng], {
+        color,
+        radius: r.estado === "solucionado" ? 10 : 14
+      })
+      .addTo(map)
+      .bindPopup(`
+        <b>${r.categoria.toUpperCase()}</b><br>
+        Estado: <b>${r.estado}</b><br>
+        Barrio: ${r.barrio}<br>
+        ${r.detalle || ""}<br>
+        ${r.fotos_url.map(u => `<img src="${u}" width="200" style="margin-top:6px;border-radius:6px;">`).join("")}
+      `);
+    });
+  }
+  cargarReportes();
+  supabase.channel("reportes").on("postgres_changes",
+    {event:"*",schema:"public",table:"reportes"},
+    () => cargarReportes()
+  ).subscribe();
+
+</script>
+
+</body>
+</html>

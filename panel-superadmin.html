@@ -1,0 +1,397 @@
+<!doctype html>
+<html lang="es" data-bs-theme="light">
+<head>
+  <meta charset="utf-8"/>
+  <title>AsuAlerta – Superadmin</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+
+  <!-- Tabler UI -->
+  <link href="https://cdn.jsdelivr.net/npm/@tabler/core@1.0.0-beta19/dist/css/tabler.min.css" rel="stylesheet"/>
+
+  <style>
+    .category-dot {
+      width: 12px; height: 12px;
+      border-radius: 50%;
+      display:inline-block;
+      margin-right:6px;
+    }
+    .foto-thumb {
+      height:60px; 
+      border-radius:6px; 
+      margin-right:4px;
+      cursor:pointer;
+    }
+    .stat-card {
+      text-align:center;
+      padding:22px;
+    }
+    .stat-number {
+      font-size:2rem;
+      font-weight:800;
+    }
+    .small-label {
+      font-size: 0.8rem;
+      text-transform: uppercase;
+      letter-spacing: .03em;
+      color: #868e96;
+    }
+  </style>
+
+  <script>
+    document.addEventListener("DOMContentLoaded", () => {
+      // aplicar tema
+      const theme = localStorage.getItem("asu_theme");
+      if (theme === "dark") document.documentElement.setAttribute("data-bs-theme","dark");
+
+      // protección de acceso
+      const token = localStorage.getItem("asu_jwt");
+      const rol = localStorage.getItem("asu_rol");
+
+      if (!token || rol !== "superadmin") {
+        location.href = "login.html";
+        return;
+      }
+    });
+  </script>
+</head>
+
+<body>
+
+<!-- NAVBAR -->
+<header class="navbar navbar-expand-md navbar-light d-print-none">
+  <div class="container-xl">
+    <h1 class="navbar-brand navbar-brand-autodark">
+      <span class="navbar-brand-text">AsuAlerta – Superadmin</span>
+    </h1>
+
+    <div class="navbar-nav flex-row order-md-last">
+
+      <!-- Dark Mode -->
+      <a href="#" class="nav-link px-2" id="themeBtn">
+        <svg xmlns="http://www.w3.org/2000/svg" class="icon" width="24" height="24"
+             viewBox="0 0 24 24">
+          <path d="M12 3C10.8 6.3 11.3 9.7 13.3 12.3C15.3 14.9 18.3 16.3 21 16C19.8 19.3 16.8 22 13 22C7.5 22 3 17.5 3 12C3 7.2 6.4 3.1 11 3A8.97 8.97 0 0 1 12 3Z"/>
+        </svg>
+      </a>
+
+      <!-- Logout -->
+      <a href="#" class="nav-link px-2" id="logoutBtn">
+        <svg xmlns="http://www.w3.org/2000/svg" class="icon" width="24"
+             height="24" viewBox="0 0 24 24">
+          <path d="M10 3H5C3.9 3 3 3.9 3 5V19C3 20.1 3.9 21 5 21H10"/>
+          <path d="M17 17L21 12L17 7"/>
+          <path d="M21 12H9"/>
+        </svg>
+      </a>
+
+    </div>
+  </div>
+</header>
+
+<!-- PAGE BODY -->
+<div class="page-body">
+  <div class="container-xl">
+
+    <!-- DASHBOARD -->
+    <div class="row row-cards">
+
+      <div class="col-sm-6 col-lg-3">
+        <div class="card stat-card">
+          <div class="small-label">Total de reportes</div>
+          <div class="stat-number" id="stat_total">0</div>
+        </div>
+      </div>
+
+      <div class="col-sm-6 col-lg-3">
+        <div class="card stat-card">
+          <div class="small-label">Pendientes</div>
+          <div class="stat-number text-warning" id="stat_pendientes">0</div>
+        </div>
+      </div>
+
+      <div class="col-sm-6 col-lg-3">
+        <div class="card stat-card">
+          <div class="small-label">Solucionados</div>
+          <div class="stat-number text-success" id="stat_solucionados">0</div>
+        </div>
+      </div>
+
+      <div class="col-sm-6 col-lg-3">
+        <div class="card stat-card">
+          <div class="small-label">T. promedio resolución</div>
+          <div class="stat-number text-primary" id="stat_tiempo">-</div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- FILTROS + TABLA -->
+    <div class="card my-4">
+      <div class="card-header">
+        <div class="d-flex align-items-center justify-content-between w-100">
+          <div>
+            <h3 class="card-title mb-0">Gestión de reportes</h3>
+            <div class="text-muted" style="font-size:0.85rem;">
+              Ver, filtrar, marcar solucionado y reasignar departamento.
+            </div>
+          </div>
+          <button class="btn btn-outline-secondary btn-sm" id="btnRefrescar">
+            Refrescar
+          </button>
+        </div>
+      </div>
+
+      <div class="card-body border-bottom">
+        <div class="row g-2">
+          <div class="col-sm-4">
+            <input id="buscar" type="text" class="form-control" placeholder="Buscar: barrio, detalle, ciudadano">
+          </div>
+
+          <div class="col-sm-4">
+            <select id="filtroEstado" class="form-select">
+              <option value="">Todos los estados</option>
+              <option value="pendiente">Pendiente</option>
+              <option value="solucionado">Solucionado</option>
+            </select>
+          </div>
+
+          <div class="col-sm-4">
+            <select id="filtroCategoria" class="form-select">
+              <option value="">Todas las categorías</option>
+              <option value="bache">Bache</option>
+              <option value="arbol">Árbol</option>
+              <option value="basura">Basural</option>
+              <option value="drogas">Drogas</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <!-- TABLA -->
+      <div class="table-responsive">
+        <table class="table table-vcenter">
+          <thead>
+            <tr>
+              <th>ID</th>
+              <th>Categoría</th>
+              <th>Barrio</th>
+              <th>Detalle</th>
+              <th>Ciudadano</th>
+              <th>Fotos</th>
+              <th>Estado</th>
+              <th>Asignar a</th>
+              <th>Acciones</th>
+            </tr>
+          </thead>
+          <tbody id="tablaReportes">
+            <tr><td colspan="9" class="text-center py-4">Cargando...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+const WORKER_URL = "https://cold-base-33cf.nanotobp.workers.dev"; // TODO: reemplazar
+const token = localStorage.getItem("asu_jwt");
+
+// map colores
+const catColors = {
+  bache: "#d32f2f",
+  arbol: "#b8860b",
+  basura: "#2e7d32",
+  drogas: "#8e24aa"
+};
+
+// eventos UI
+document.getElementById("logoutBtn").onclick = () => {
+  localStorage.clear();
+  location.href = "login.html";
+};
+
+document.getElementById("themeBtn").onclick = () => {
+  const actual = document.documentElement.getAttribute("data-bs-theme");
+  const nuevo = actual === "dark" ? "light" : "dark";
+  document.documentElement.setAttribute("data-bs-theme", nuevo);
+  localStorage.setItem("asu_theme", nuevo);
+};
+
+document.getElementById("btnRefrescar").onclick = () => cargarTodo();
+
+document.getElementById("buscar").oninput = filtrar;
+document.getElementById("filtroEstado").onchange = filtrar;
+document.getElementById("filtroCategoria").onchange = filtrar;
+
+let reportesOriginal = [];
+
+// helpers
+async function fetchAuthed(path, options = {}) {
+  const res = await fetch(`${WORKER_URL}${path}`, {
+    ...options,
+    headers: {
+      Authorization: "Bearer " + token,
+      ...(options.headers || {})
+    }
+  });
+  const json = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    alert(json.error || "Error en el servidor");
+    throw new Error(json.error || "Error");
+  }
+  return json;
+}
+
+// cargar todo: stats + lista
+async function cargarTodo() {
+  const [stats, lista] = await Promise.all([
+    fetchAuthed("/estadisticas"),
+    fetchAuthed("/listarReportes")
+  ]);
+
+  reportesOriginal = lista.data || [];
+  renderStats(stats);
+  renderTabla(reportesOriginal);
+}
+
+function renderStats(stats) {
+  document.getElementById("stat_total").textContent = stats.total ?? 0;
+  document.getElementById("stat_pendientes").textContent = stats.pendientes ?? 0;
+  document.getElementById("stat_solucionados").textContent = stats.solucionados ?? 0;
+
+  if (stats.promedio_horas_resolucion != null) {
+    const hrs = stats.promedio_horas_resolucion;
+    if (hrs < 1) {
+      const min = Math.round(hrs * 60);
+      document.getElementById("stat_tiempo").textContent = min + " min";
+    } else {
+      document.getElementById("stat_tiempo").textContent = hrs.toFixed(1) + " h";
+    }
+  } else {
+    document.getElementById("stat_tiempo").textContent = "-";
+  }
+}
+
+function renderTabla(lista) {
+  const tbody = document.getElementById("tablaReportes");
+
+  if (!lista.length) {
+    tbody.innerHTML = `<tr><td colspan="9" class="text-center py-4">Sin datos</td></tr>`;
+    return;
+  }
+
+  tbody.innerHTML = lista.map(r => `
+    <tr>
+      <td>${r.id}</td>
+
+      <td>
+        <span class="category-dot" style="background:${catColors[r.categoria] || "#999"}"></span>
+        ${r.categoria ? r.categoria.toUpperCase() : "-"}
+      </td>
+
+      <td>${r.barrio || "-"}</td>
+
+      <td>${r.detalle || "-"}</td>
+
+      <td>
+        ${r.nombre || "-"}<br>
+        <span class="text-muted" style="font-size:0.8rem;">${r.celular || ""}</span>
+      </td>
+
+      <td>
+        ${(Array.isArray(r.fotos_url) ? r.fotos_url : []).map(u => `
+          <img src="${u}" class="foto-thumb" onclick="window.open('${u}','_blank')">
+        `).join("")}
+      </td>
+
+      <td>
+        ${r.estado === "solucionado"
+          ? '<span class="badge bg-success">Solucionado</span>'
+          : '<span class="badge bg-warning">Pendiente</span>'
+        }
+      </td>
+
+      <td>
+        <select class="form-select form-select-sm" id="depto-${r.id}">
+          <option value="">Elegir...</option>
+          <option value="obras">Obras</option>
+          <option value="aseo">Aseo urbano</option>
+          <option value="parques">Parques</option>
+          <option value="seguridad">Seguridad</option>
+        </select>
+      </td>
+
+      <td>
+        <div class="btn-list flex-nowrap">
+          ${
+            r.estado === "pendiente" 
+              ? `<button class="btn btn-sm btn-success" onclick="marcarSolucionado(${r.id})">
+                   ✓ Solucionado
+                 </button>`
+              : ""
+          }
+          <button class="btn btn-sm btn-outline-primary" onclick="reasignar(${r.id})">
+            ⇄ Reasignar
+          </button>
+        </div>
+      </td>
+    </tr>
+  `).join("");
+}
+
+// filtros
+function filtrar() {
+  const q = document.getElementById("buscar").value.toLowerCase();
+  const est = document.getElementById("filtroEstado").value;
+  const cat = document.getElementById("filtroCategoria").value;
+
+  const filtrados = reportesOriginal.filter(r =>
+    (!est || r.estado === est) &&
+    (!cat || r.categoria === cat) &&
+    (
+      r.detalle?.toLowerCase().includes(q) ||
+      r.barrio?.toLowerCase().includes(q) ||
+      r.nombre?.toLowerCase().includes(q)
+    )
+  );
+
+  renderTabla(filtrados);
+}
+
+// acciones
+async function marcarSolucionado(id) {
+  if (!confirm("¿Marcar este reporte como solucionado?")) return;
+  await fetchAuthed("/marcarSolucionado", {
+    method: "POST",
+    headers: {"Content-Type":"application/json"},
+    body: JSON.stringify({ id })
+  });
+  await cargarTodo();
+}
+
+async function reasignar(id) {
+  const sel = document.getElementById(`depto-${id}`);
+  const nuevo = sel.value;
+
+  if (!nuevo) {
+    alert("Elegí el nuevo departamento.");
+    return;
+  }
+  if (!confirm(`¿Reasignar reporte #${id} a ${nuevo.toUpperCase()}?`)) return;
+
+  await fetchAuthed("/reasignarReporte", {
+    method: "POST",
+    headers: {"Content-Type":"application/json"},
+    body: JSON.stringify({ id, nuevo_departamento: nuevo })
+  });
+
+  await cargarTodo();
+}
+
+// inicio
+cargarTodo();
+</script>
+
+</body>
+</html>

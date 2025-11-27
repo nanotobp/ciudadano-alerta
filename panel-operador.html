@@ -1,0 +1,257 @@
+<!doctype html>
+<html lang="es" data-bs-theme="light">
+<head>
+  <meta charset="utf-8"/>
+  <title>AsuAlerta – Operador</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+
+  <link href="https://cdn.jsdelivr.net/npm/@tabler/core@1.0.0-beta19/dist/css/tabler.min.css" rel="stylesheet"/>
+
+  <style>
+    .category-dot {
+      width: 12px; height: 12px;
+      border-radius: 50%;
+      display:inline-block;
+      margin-right:6px;
+    }
+    .foto-thumb {
+      height:60px; 
+      border-radius:6px; 
+      margin-right:4px;
+    }
+  </style>
+
+  <script>
+    document.addEventListener("DOMContentLoaded", () => {
+      // aplicar tema guardado
+      const theme = localStorage.getItem("asu_theme");
+      if (theme === "dark") document.documentElement.setAttribute("data-bs-theme","dark");
+
+      // proteger acceso
+      const token = localStorage.getItem("asu_jwt");
+      const rol = localStorage.getItem("asu_rol");
+
+      if (!token || rol !== "operador") {
+        location.href = "login.html";
+        return;
+      }
+    });
+  </script>
+</head>
+
+<body>
+
+  <!-- NAVBAR -->
+  <header class="navbar navbar-expand-md navbar-light d-print-none">
+    <div class="container-xl">
+      <h1 class="navbar-brand navbar-brand-autodark">
+        <span class="navbar-brand-text">AsuAlerta – Operador</span>
+      </h1>
+
+      <div class="navbar-nav flex-row order-md-last">
+
+        <!-- Dark Mode -->
+        <a href="#" class="nav-link px-2" id="themeBtn">
+          <svg xmlns="http://www.w3.org/2000/svg" class="icon" width="24" height="24" viewBox="0 0 24 24">
+            <path d="M12 3C10.8 6.3 11.3 9.7 13.3 12.3C15.3 14.9 18.3 16.3 21 16C19.8 19.3 16.8 22 13 22C7.5 22 3 17.5 3 12C3 7.2 6.4 3.1 11 3A8.97 8.97 0 0 1 12 3Z"/>
+          </svg>
+        </a>
+
+        <!-- Logout -->
+        <a href="#" class="nav-link px-2" id="logoutBtn">
+          <svg xmlns="http://www.w3.org/2000/svg" class="icon" width="24" height="24" viewBox="0 0 24 24">
+            <path d="M10 3H5C3.9 3 3 3.9 3 5V19C3 20.1 3.9 21 5 21H10"/>
+            <path d="M17 17L21 12L17 7"/>
+            <path d="M21 12H9"/>
+          </svg>
+        </a>
+
+      </div>
+    </div>
+  </header>
+
+  <!-- CONTENIDO -->
+  <div class="page-body">
+    <div class="container-xl">
+
+      <div class="card mb-3">
+        <div class="card-header">
+          <h3 class="card-title">Reportes asignados a tu departamento</h3>
+        </div>
+        <div class="card-body border-bottom py-2">
+
+          <!-- FILTROS -->
+          <div class="row">
+            <div class="col-sm-6 col-lg-3 mb-2">
+              <input type="text" class="form-control" id="buscar" placeholder="Buscar por nombre, barrio o detalle">
+            </div>
+
+            <div class="col-sm-6 col-lg-3 mb-2">
+              <select id="filtroEstado" class="form-select">
+                <option value="">Todos los estados</option>
+                <option value="pendiente">Pendiente</option>
+                <option value="solucionado">Solucionado</option>
+              </select>
+            </div>
+          </div>
+
+        </div>
+
+        <div class="table-responsive" id="tablaContainer">
+          <table class="table table-vcenter">
+            <thead>
+              <tr>
+                <th>ID</th>
+                <th>Categoría</th>
+                <th>Barrio</th>
+                <th>Detalle</th>
+                <th>Fotos</th>
+                <th>Estado</th>
+                <th>Acción</th>
+              </tr>
+            </thead>
+            <tbody id="tablaReportes">
+              <tr><td colspan="7" class="text-center py-4">Cargando...</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+      </div>
+
+    </div>
+  </div>
+
+<script>
+const WORKER_URL = "https://cold-base-33cf.nanotobp.workers.dev";
+
+const token = localStorage.getItem("asu_jwt");
+const email = localStorage.getItem("asu_email");
+const departamentoSlug = localStorage.getItem("asu_departamento");
+
+// COLORES POR CATEGORÍA
+const catColors = {
+  bache: "#d32f2f",
+  arbol: "#b8860b",
+  basura: "#2e7d32",
+  drogas: "#8e24aa"
+};
+
+// EVENTOS UI
+document.getElementById("logoutBtn").onclick = () => {
+  localStorage.clear();
+  location.href = "login.html";
+};
+
+document.getElementById("themeBtn").onclick = () => {
+  const actual = document.documentElement.getAttribute("data-bs-theme");
+  const nuevo = actual === "dark" ? "light" : "dark";
+  document.documentElement.setAttribute("data-bs-theme", nuevo);
+  localStorage.setItem("asu_theme", nuevo);
+};
+
+document.getElementById("buscar").oninput = filtrar;
+document.getElementById("filtroEstado").onchange = filtrar;
+
+let reportesOriginal = [];
+
+// CARGAR REPORTES
+async function cargarReportes() {
+  const res = await fetch(`${WORKER_URL}/listarReportes`, {
+    headers: { Authorization: "Bearer " + token }
+  });
+
+  const json = await res.json();
+  reportesOriginal = json.data || [];
+  renderTabla(reportesOriginal);
+}
+
+function renderTabla(lista) {
+  const tbody = document.getElementById("tablaReportes");
+
+  if (!lista.length) {
+    tbody.innerHTML = `<tr><td colspan="7" class="text-center py-4">Sin reportes</td></tr>`;
+    return;
+  }
+
+  tbody.innerHTML = lista.map(r => `
+    <tr>
+      <td>${r.id}</td>
+
+      <td>
+        <span class="category-dot" style="background:${catColors[r.categoria] || "#999"}"></span>
+        ${r.categoria.toUpperCase()}
+      </td>
+
+      <td>${r.barrio || "-"}</td>
+
+      <td>${r.detalle || "-"}</td>
+
+      <td>
+        ${(r.fotos_url || []).map(u => `
+          <img class="foto-thumb" src="${u}">
+        `).join("")}
+      </td>
+
+      <td>
+        ${r.estado === "solucionado"
+          ? '<span class="badge bg-success">Solucionado</span>'
+          : '<span class="badge bg-warning">Pendiente</span>'
+        }
+      </td>
+
+      <td>
+        ${r.estado === "pendiente" ? `
+          <button class="btn btn-sm btn-success" onclick="marcarSolucionado(${r.id})">
+            Resolver
+          </button>
+        ` : "-"}
+      </td>
+    </tr>
+  `).join("");
+}
+
+function filtrar() {
+  const q = document.getElementById("buscar").value.toLowerCase();
+  const est = document.getElementById("filtroEstado").value;
+
+  const filtrados = reportesOriginal.filter(r => 
+    (!est || r.estado === est) &&
+    (
+      r.detalle?.toLowerCase().includes(q) ||
+      r.barrio?.toLowerCase().includes(q) ||
+      r.nombre?.toLowerCase().includes(q)
+    )
+  );
+
+  renderTabla(filtrados);
+}
+
+// MARCAR SOLUCIONADO
+async function marcarSolucionado(id) {
+  if (!confirm("¿Confirmás marcar como solucionado?")) return;
+
+  const res = await fetch(`${WORKER_URL}/marcarSolucionado`, {
+    method: "POST",
+    headers: {
+      "Authorization": "Bearer " + token,
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({ id })
+  });
+
+  const json = await res.json();
+
+  if (!res.ok) {
+    alert(json.error || "Error");
+    return;
+  }
+
+  cargarReportes();
+}
+
+// Inicial
+cargarReportes();
+</script>
+
+</body>
+</html>
