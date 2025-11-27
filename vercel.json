@@ -1,8 +1,35 @@
 {
   "rewrites": [
     {
-      "source": "/(.*)",
+      "source": "/",
       "destination": "/index.html"
+    },
+    {
+      "source": "/login",
+      "destination": "/login.html"
+    },
+    {
+      "source": "/panel-intendente",
+      "destination": "/panel-intendente.html"
+    },
+    {
+      "source": "/panel-operador",
+      "destination": "/panel-operador.html"
+    },
+    {
+      "source": "/panel-superadmin",
+      "destination": "/panel-superadmin.html"
+    }
+  ],
+  "headers": [
+    {
+      "source": "/(.*)",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=0, must-revalidate"
+        }
+      ]
     }
   ]
 }
